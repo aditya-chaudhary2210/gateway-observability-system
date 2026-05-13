@@ -24,14 +24,17 @@ final class CorrelationIdGatewayFilter implements GlobalFilter, Ordered {
         var httpRequest = exchange.getRequest().mutate().headers(h -> h.set(HEADER_CORRELATION, canonical)).build();
         ServerWebExchange outgoing = exchange.mutate().request(httpRequest).build();
 
-        return chain.filter(outgoing)
-                .then(
-                        Mono.fromRunnable(
-                                () -> {
-                                    if (outgoing.getResponse().getHeaders().getFirst(HEADER_CORRELATION) == null) {
-                                        outgoing.getResponse().getHeaders().set(HEADER_CORRELATION, canonical);
-                                    }
-                                }));
+        // Must not set response headers in chain.filter(...).then(...) — by then the response is often
+        // committed and headers are read-only (ReadOnlyHttpHeaders), which breaks chunked responses.
+        outgoing.getResponse()
+                .beforeCommit(() -> {
+                    if (outgoing.getResponse().getHeaders().getFirst(HEADER_CORRELATION) == null) {
+                        outgoing.getResponse().getHeaders().set(HEADER_CORRELATION, canonical);
+                    }
+                    return Mono.empty();
+                });
+
+        return chain.filter(outgoing);
     }
 
     private static String sanitizeIncomingCorrelation(String inbound) {
