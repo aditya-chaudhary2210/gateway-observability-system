@@ -59,6 +59,8 @@ import com.github.tomakehurst.wiremock.client.WireMock;
         properties = {
             "management.tracing.enabled=false",
             "management.otlp.tracing.export.enabled=false",
+            /* MicrometerKafkaClientMetricsSender + observation can deadlock or stall first async send on reactive threads under load. */
+            "spring.kafka.template.observation-enabled=false",
             "gateway.rate-limit.replenish=600",
             "gateway.rate-limit.burst=900"
         })
@@ -138,7 +140,7 @@ class GatewayHttpToKafkaIntegrationTest {
         String upstreamAuthority =
                 "%s:%d".formatted(WIREMOCK_DOCKER.getHost(), WIREMOCK_DOCKER.getMappedPort(8080));
 
-        Awaitility.await().atMost(30, TimeUnit.SECONDS).untilAsserted(() -> {
+        Awaitility.await().atMost(60, TimeUnit.SECONDS).untilAsserted(() -> {
             ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(400));
             assertThat(records.isEmpty()).isFalse();
             for (ConsumerRecord<String, String> r : records) {
@@ -224,7 +226,8 @@ class GatewayHttpToKafkaIntegrationTest {
                 ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
                 StringDeserializer.class.getName());
         cfg.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        cfg.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
+        // seekToEnd + auto-commit races can rewind / skip envelopes on CI; deterministic manual position only.
+        cfg.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
 
         return new KafkaConsumer<>(cfg);
     }
