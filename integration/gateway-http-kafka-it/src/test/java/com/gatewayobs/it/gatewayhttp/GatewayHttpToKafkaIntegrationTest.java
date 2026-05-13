@@ -13,6 +13,11 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gatewayobs.gateway.GatewayObservabilityApplication;
 import com.gatewayobs.telemetry.model.Topics;
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.HashMap;
@@ -34,7 +39,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.web.reactive.server.WebTestClient;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -59,6 +63,9 @@ class GatewayHttpToKafkaIntegrationTest {
 
     private static final DockerImageName WIREMOCK_IMAGE =
             DockerImageName.parse("docker.io/wiremock/wiremock:3.13.1");
+
+    private static final Duration HTTP_CONNECT = Duration.ofSeconds(10);
+    private static final Duration HTTP_REQUEST = Duration.ofSeconds(45);
 
     @Container
     static final KafkaContainer KAFKA = new KafkaContainer(KAFKA_IMAGE);
@@ -118,17 +125,8 @@ class GatewayHttpToKafkaIntegrationTest {
 
     @Test
     void http_via_gateway_emits_kafka_gateway_access_envelope() {
-        WebTestClient.bindToServer()
-                .responseTimeout(Duration.ofSeconds(15))
-                .baseUrl("http://127.0.0.1:" + serverPort)
-                .build()
-                .get()
-                .uri("/mock/integration-ok")
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody(String.class)
-                .isEqualTo("upstream-ok");
+        awaitGatewayHealthy();
+        assertIngressViaMockRoute();
 
         String upstreamAuthority =
                 "%s:%d".formatted(WIREMOCK_DOCKER.getHost(), WIREMOCK_DOCKER.getMappedPort(8080));
@@ -149,6 +147,48 @@ class GatewayHttpToKafkaIntegrationTest {
                 return;
             }
             throw new AssertionError("expected gateway-access envelope for /mock/integration-ok");
+        });
+    }
+
+    /** Avoid Reactor Netty WebTestClient flakes (PrematureCloseException) against a cold gateway on CI. */
+    private void awaitGatewayHealthy() {
+        HttpClient client = HttpClient.newBuilder().connectTimeout(HTTP_CONNECT).build();
+        Awaitility.await().atMost(90, TimeUnit.SECONDS).pollInterval(250, TimeUnit.MILLISECONDS).untilAsserted(() -> {
+            try {
+                HttpRequest req = HttpRequest.newBuilder()
+                        .uri(URI.create("http://127.0.0.1:" + serverPort + "/actuator/health"))
+                        .timeout(Duration.ofSeconds(10))
+                        .GET()
+                        .build();
+                HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+                assertThat(resp.statusCode()).isEqualTo(200);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new AssertionError(e);
+            } catch (IOException e) {
+                throw new AssertionError("health check failed: " + e.getMessage(), e);
+            }
+        });
+    }
+
+    private void assertIngressViaMockRoute() {
+        HttpClient client = HttpClient.newBuilder().connectTimeout(HTTP_CONNECT).build();
+        Awaitility.await().atMost(60, TimeUnit.SECONDS).pollInterval(400, TimeUnit.MILLISECONDS).untilAsserted(() -> {
+            try {
+                HttpRequest req = HttpRequest.newBuilder()
+                        .uri(URI.create("http://127.0.0.1:" + serverPort + "/mock/integration-ok"))
+                        .timeout(HTTP_REQUEST)
+                        .GET()
+                        .build();
+                HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+                assertThat(resp.statusCode()).isEqualTo(200);
+                assertThat(resp.body()).isEqualTo("upstream-ok");
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new AssertionError(e);
+            } catch (IOException e) {
+                throw new AssertionError("ingress GET failed: " + e.getMessage(), e);
+            }
         });
     }
 
