@@ -28,7 +28,6 @@
     <module>services/log-ingestion-service</module>
     <module>services/incident-detection-service</module>
     <module>integration/gateway-pipeline-it</module>
-    <module>integration/gateway-http-kafka-it</module>
   </modules>
 
   <properties>

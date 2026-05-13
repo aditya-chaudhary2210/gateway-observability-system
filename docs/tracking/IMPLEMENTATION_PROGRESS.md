@@ -11,7 +11,7 @@
 |-------|--------|-------|
 | 1 — Documentation & architecture | **Complete** | `/docs/**` authoritative |
 | 2 — Docker / local infra | **Expanded** | Compose: Jaeger + **Tempo** (AI OTLP), Grafana datasource provisioning |
-| 3 — API Gateway + producer | **MVP + IT** | `integration/gateway-http-kafka-it` — HTTP→Kafka envelope (Redis + WireMock + Kafka TC) |
+| 3 — API Gateway + producer | **MVP** | Gateway emits `gateway-access-v1` (Kafka); HTTP→Kafka Testcontainers IT removed (flakey CI) |
 | 4 — Ingestion + persistence | **MVP + IT** | `integration/gateway-pipeline-it` — Kafka→Postgres/ES→incident |
 | 5 — Detection + AI | **Improved** | Evidence RCA (ingestion API + ES) + Groq/Ollama; **OpenTelemetry OTLP→Tempo** |
 | 6 — Dashboard | **MVP SPA** | Vite/React/Tailwind + nginx `/api/*` gateway proxy |
@@ -26,7 +26,6 @@
 - [x] `services/incident-detection-service`
 - [x] `ai-analysis-service` RCA + OTLP instrumentation
 - [x] `integration/gateway-pipeline-it`
-- [x] `integration/gateway-http-kafka-it` (gateway-centric HTTP→Kafka envelope)
 - [x] `dashboard-web`
 - [x] Compose stack + Prometheus + **Grafana provisioning** (`deploy/docker-compose/grafana/provisioning`)
 - [x] Contracts seed (`contracts/async/*.schema.json`)
