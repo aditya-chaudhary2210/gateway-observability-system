@@ -24,11 +24,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.clients.admin.KafkaAdminClient;
+import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.errors.TopicExistsException;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
@@ -99,6 +105,7 @@ class GatewayHttpToKafkaIntegrationTest {
 
     @BeforeEach
     void stubsAndKafkaSeekEnd() {
+        ensureGatewayAccessTopicPresent();
         WireMock.configureFor(WIREMOCK_DOCKER.getHost(), WIREMOCK_DOCKER.getMappedPort(8080));
         WireMock.reset();
         WireMock.stubFor(
@@ -225,5 +232,26 @@ class GatewayHttpToKafkaIntegrationTest {
     private static void drainOutstanding(KafkaConsumer<String, String> c, Duration maxWall) {
         long deadlineNanos = System.nanoTime() + maxWall.toNanos();
         while (System.nanoTime() < deadlineNanos && !c.poll(Duration.ofMillis(200)).isEmpty()) {}
+    }
+
+    /** KRaft Testcontainers Kafka may disallow auto-topic create; ingestion IT uses its own broker so this topic is never pre-created across modules. */
+    private static void ensureGatewayAccessTopicPresent() {
+        Map<String, Object> adminCfg =
+                Map.of(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers());
+        try (AdminClient admin = KafkaAdminClient.create(adminCfg)) {
+            admin.createTopics(List.of(new NewTopic(Topics.GATEWAY_ACCESS_V1, 1, (short) 1)))
+                    .all()
+                    .get(60, TimeUnit.SECONDS);
+        } catch (ExecutionException e) {
+            if (e.getCause() instanceof TopicExistsException) {
+                return;
+            }
+            throw new AssertionError("create topic " + Topics.GATEWAY_ACCESS_V1, e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError(e);
+        } catch (java.util.concurrent.TimeoutException e) {
+            throw new AssertionError("create topic " + Topics.GATEWAY_ACCESS_V1, e);
+        }
     }
 }

@@ -61,7 +61,11 @@ class AccessTelemetryKafkaGatewayFilter implements GlobalFilter, Ordered {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         var startNanos = System.nanoTime();
-        return chain.filter(exchange).then(Mono.fromRunnable(() -> emit(exchange, startNanos))).subscribeOn(Schedulers.boundedElastic()).then();
+        // Run telemetry after routing completes on the Netty/Reactor-Netty scheduler, then offload blocking Kafka I/O —
+        // do not subscribeOn() the whole chain upstream; that skews Gateway exchange lifecycle so emit() may never run.
+        return chain.filter(exchange)
+                .publishOn(Schedulers.boundedElastic())
+                .then(Mono.fromRunnable(() -> emit(exchange, startNanos)));
     }
 
     private void emit(ServerWebExchange exchange, long startNanos) {
