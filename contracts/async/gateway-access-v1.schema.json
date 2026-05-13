@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gatewayobs.local/schemas/gateway-access-v1.json",
+  "title": "GatewayAccessEnvelope",
+  "type": "object",
+  "required": ["schemaVersion", "eventType", "occurredAt", "correlationId", "payload"],
+  "properties": {
+    "schemaVersion": { "type": "integer", "minimum": 1 },
+    "eventType": { "const": "GatewayAccessEmitted" },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "correlationId": { "type": "string", "minLength": 4 },
+    "traceContext": {
+      "type": "object",
+      "properties": {
+        "traceId": { "type": "string" },
+        "spanId": { "type": "string" },
+        "traceparentHeader": { "type": "string" }
+      }
+    },
+    "producer": {
+      "type": "object",
+      "required": ["service", "instanceId"],
+      "properties": {
+        "service": { "type": "string" },
+        "instanceId": { "type": "string" }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "required": ["eventId", "routeId", "httpMethod", "pathTemplate", "statusCode", "latencyMs"],
+      "properties": {
+        "eventId": { "type": "string", "format": "uuid" },
+        "routeId": { "type": "string" },
+        "httpMethod": { "type": "string" },
+        "pathTemplate": { "type": "string" },
+        "statusCode": { "type": "integer" },
+        "latencyMs": { "type": "integer", "minimum": 0 },
+        "upstreamId": { "type": "string" },
+        "clientIdHash": { "type": "string" },
+        "clientIp": { "type": "string" },
+        "userAgentSnippet": { "type": "string" }
+      }
+    }
+  }
+}

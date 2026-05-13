@@ -1,0 +1,51 @@
+name: ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  java:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      # GitHub-hosted runners expose Docker socket; Testcontainers @Test runs here (gateway pipeline + gateway→Kafka HTTP).
+      - name: Maven verify (unit + integration)
+        run: mvn -B verify
+
+  dashboard:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard-web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install + build
+        run: |
+          npm install
+          npm run build
+
+  ai:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ai-analysis-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Syntax check
+        run: |
+          python -m pip install -r requirements.txt
+          python -m compileall app

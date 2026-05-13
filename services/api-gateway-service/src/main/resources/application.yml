@@ -1,0 +1,118 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway-service
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      connect-timeout: 2s
+      timeout: 2s
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    template:
+      observation-enabled: true
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      client-id: gateway-telemetry-${random.uuid}
+
+gateway:
+  instance-id: ${GATEWAY_INSTANCE_ID:${HOSTNAME:local-gateway}}
+  telemetry:
+    kafka:
+      enabled: true
+  chaos:
+    allow-header: ${GATEWAY_CHAOS_ALLOW_HEADER:false}
+  rate-limit:
+    replenish: ${GATEWAY_RL_REPLENISH:240}
+    burst: ${GATEWAY_RL_BURST:360}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics,gateway
+  metrics:
+    tags:
+      application: api-gateway-service
+  tracing:
+    sampling:
+      probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:1.0}
+    propagation:
+      type: w3c,b3
+    baggage:
+      correlation:
+        enabled: true
+  otlp:
+    tracing:
+      export:
+        enabled: ${OTEL_EXPORT_ENABLED:true}
+      endpoint: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:http://localhost:4318/v1/traces}
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:app},%X{traceId:-},%X{spanId:-}]"
+  level:
+    org.springframework.kafka: WARN
+    org.springframework.cloud.gateway: INFO
+    com.gatewayobs.gateway: INFO
+
+spring.cloud:
+  gateway:
+    globalcors:
+      cors-configurations:
+        '[/**]':
+          allowed-origin-patterns: '*'
+          allowed-methods:
+            - GET
+            - POST
+            - OPTIONS
+            - PUT
+          allowed-headers: '*'
+    routes:
+      - id: upstream-mock
+        uri: http://${UPSTREAM_MOCK_HOST:localhost}:${UPSTREAM_MOCK_PORT:7080}
+        predicates:
+          - Path=/mock/**
+        filters:
+          - StripPrefix=1
+          - name: CircuitBreaker
+            args:
+              name: upstreamMockCb
+              fallbackUri: forward:/fallback/mock-circuit-breaker
+          - name: RequestRateLimiter
+            args:
+              redis-rate-limiter.replenishRate: ${gateway.rate-limit.replenish}
+              redis-rate-limiter.burstCapacity: ${gateway.rate-limit.burst}
+              key-resolver: "#{@ipKeyResolver}"
+      - id: incidents-read-api
+        uri: http://${LOG_INGESTION_HOST:localhost}:${LOG_INGESTION_PORT:8090}
+        predicates:
+          - Path=/api/v1/incidents/**
+      - id: ai-rca-public
+        uri: http://${AI_SERVICE_HOST:localhost}:${AI_SERVICE_PORT:8082}
+        predicates:
+          - Path=/api/ai/rca,/api/ai/rca/**
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowSize: 25
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 5
+        waitDurationInOpenState: 5s
+        failureRateThreshold: 50
+        slowCallRateThreshold: 50
+        slowCallDurationThreshold: 750ms
+    instances:
+      upstreamMockCb:
+        baseConfig: default

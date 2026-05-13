@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!--
+    Ownership: Platform
+    Maven aggregator: Java 21 Spring Boot services + thin shared telemetry library.
+  -->
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>3.4.4</version>
+    <relativePath/>
+  </parent>
+
+  <groupId>com.gatewayobs</groupId>
+  <artifactId>gateway-observability-parent</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+  <name>gateway-observability-parent</name>
+  <description>AI-powered API gateway observability platform (resume-grade monorepo)</description>
+
+  <modules>
+    <module>platform/observability-java</module>
+    <module>services/api-gateway-service</module>
+    <module>services/log-ingestion-service</module>
+    <module>services/incident-detection-service</module>
+    <module>integration/gateway-pipeline-it</module>
+    <module>integration/gateway-http-kafka-it</module>
+  </modules>
+
+  <properties>
+    <java.version>21</java.version>
+    <spring-cloud.version>2024.0.1</spring-cloud.version>
+    <commons-lang3.version>3.17.0</commons-lang3.version>
+    <testcontainers.version>1.21.3</testcontainers.version>
+    <wiremock.version>3.12.1</wiremock.version>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.springframework.cloud</groupId>
+        <artifactId>spring-cloud-dependencies</artifactId>
+        <version>${spring-cloud.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.gatewayobs</groupId>
+        <artifactId>observability-java</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.gatewayobs</groupId>
+        <artifactId>log-ingestion-service</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.gatewayobs</groupId>
+        <artifactId>incident-detection-service</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.gatewayobs</groupId>
+        <artifactId>api-gateway-service</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.testcontainers</groupId>
+        <artifactId>testcontainers-bom</artifactId>
+        <version>${testcontainers.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.springframework.boot</groupId>
+          <artifactId>spring-boot-maven-plugin</artifactId>
+          <configuration>
+            <layers enabled="true"/>
+            <!-- Thin library jar keeps consumer modules (pipeline IT) compilable -->
+            <classifier>exec</classifier>
+          </configuration>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
+</project>

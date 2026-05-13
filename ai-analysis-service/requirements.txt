@@ -1,0 +1,15 @@
+fastapi==0.115.13
+setuptools>=69,<81
+uvicorn[standard]==0.34.3
+pydantic==2.11.10
+pydantic-settings==2.9.1
+httpx==0.28.1
+openai==1.82.1
+
+# OpenTelemetry (FastAPI spans + OTLP HTTP to Jaeger/Tempo; trace_id in logs)
+opentelemetry-api==1.27.0
+opentelemetry-sdk==1.27.0
+opentelemetry-exporter-otlp-proto-http==1.27.0
+opentelemetry-instrumentation-fastapi==0.48b0
+opentelemetry-instrumentation-logging==0.48b0
+opentelemetry-instrumentation-asgi==0.48b0

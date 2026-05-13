@@ -1,0 +1,64 @@
+server:
+  port: 8090
+
+spring:
+  application:
+    name: log-ingestion-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/gatewayobs}
+    username: ${SPRING_DATASOURCE_USERNAME:gatewayobs}
+    password: ${SPRING_DATASOURCE_PASSWORD:gatewayobs}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    template:
+      observation-enabled: true
+    consumer:
+      group-id: log-ingestion-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      observation-enabled: true
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+  elasticsearch:
+    uris: ${SPRING_ELASTICSEARCH_URIS:http://localhost:9200}
+    connection-timeout: 3s
+    socket-timeout: 6s
+
+ingestion:
+  gateway-topic: ${INGESTION_GATEWAY_TOPIC:gateway-access-v1}
+  enriched-topic: ${INGESTION_ENRICHED_TOPIC:telemetry-enriched-v1}
+  es-index: ${INGESTION_ES_INDEX:gateway-events-active}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  tracing:
+    sampling:
+      probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:1.0}
+    propagation:
+      type: w3c,b3
+    baggage:
+      correlation:
+        enabled: true
+  otlp:
+    tracing:
+      export:
+        enabled: ${OTEL_EXPORT_ENABLED:true}
+      endpoint: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:http://localhost:4318/v1/traces}
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:app},%X{traceId:-},%X{spanId:-}]"
+  level:
+    com.gatewayobs: INFO

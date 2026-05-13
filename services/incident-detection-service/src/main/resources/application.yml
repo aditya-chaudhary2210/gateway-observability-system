@@ -1,0 +1,60 @@
+server:
+  port: 8091
+
+spring:
+  application:
+    name: incident-detection-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/gatewayobs}
+    username: ${SPRING_DATASOURCE_USERNAME:gatewayobs}
+    password: ${SPRING_DATASOURCE_PASSWORD:gatewayobs}
+    hikari:
+      maximum-pool-size: 8
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    template:
+      observation-enabled: true
+    consumer:
+      group-id: incident-detection-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      observation-enabled: true
+    producer:
+      client-id: incident-detection
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+detection:
+  enriched-topic: ${DETECTION_ENRICHED_TOPIC:telemetry-enriched-v1}
+  incidents-topic: ${DETECTION_INCIDENTS_TOPIC:incidents-v1}
+  latency-threshold-ms: ${DETECTION_LATENCY_THRESHOLD_MS:1500}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  tracing:
+    sampling:
+      probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:1.0}
+    propagation:
+      type: w3c,b3
+    baggage:
+      correlation:
+        enabled: true
+  otlp:
+    tracing:
+      export:
+        enabled: ${OTEL_EXPORT_ENABLED:true}
+      endpoint: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:http://localhost:4318/v1/traces}
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:app},%X{traceId:-},%X{spanId:-}]"
+  level:
+    com.gatewayobs.detection: INFO
