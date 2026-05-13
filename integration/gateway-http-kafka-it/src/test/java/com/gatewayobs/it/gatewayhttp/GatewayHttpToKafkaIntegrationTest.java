@@ -54,8 +54,8 @@ import com.github.tomakehurst.wiremock.client.WireMock;
         })
 class GatewayHttpToKafkaIntegrationTest {
 
-    private static final DockerImageName KAFKA_IMAGE =
-            DockerImageName.parse("confluentinc/cp-kafka:7.6.2").asCompatibleSubstituteFor("apache/kafka");
+    /** Official Apache Kafka image (KRaft); matches Testcontainers KafkaContainer wait/entrypoint. */
+    private static final DockerImageName KAFKA_IMAGE = DockerImageName.parse("apache/kafka:3.8.1");
 
     private static final DockerImageName WIREMOCK_IMAGE =
             DockerImageName.parse("docker.io/wiremock/wiremock:3.13.1");

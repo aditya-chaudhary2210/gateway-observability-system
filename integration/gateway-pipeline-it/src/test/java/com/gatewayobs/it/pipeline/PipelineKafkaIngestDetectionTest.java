@@ -33,8 +33,8 @@ import org.testcontainers.utility.DockerImageName;
         })
 class PipelineKafkaIngestDetectionTest {
 
-    private static final DockerImageName KAFKA_IMAGE =
-            DockerImageName.parse("confluentinc/cp-kafka:7.6.2").asCompatibleSubstituteFor("apache/kafka");
+    /** Official Apache Kafka image (KRaft); Confluent cp-kafka 7.6+ no longer matches Testcontainers' boot path in CI. */
+    private static final DockerImageName KAFKA_IMAGE = DockerImageName.parse("apache/kafka:3.8.1");
 
     private static final DockerImageName ES_IMAGE =
             DockerImageName.parse("docker.elastic.co/elasticsearch/elasticsearch:8.15.3");
